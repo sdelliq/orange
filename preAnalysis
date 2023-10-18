@@ -1,0 +1,17 @@
+Analysis info:
+
+PKS:
+original.BorrowerData   # PK: NDG unique 100%
+original.LoansData      # PK: Loan Id No. unique 100.00%
+original.CoOwnersData   # highest ratio Fiscal Code 98.07% - has NA
+original.GuarantorsData # PK: Guarantor Id No. unique 100%
+original.GuaranteesData # highest ratio Guarantee Id No. 82.68% - no NAs
+
+
+465 co-owners 
+All co-owners have the same id.bor than other borrowers 
+42 co-owners have the same cf.piva but different id.bor
+
+
+
+
