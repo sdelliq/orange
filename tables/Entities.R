@@ -96,5 +96,5 @@ ENTITIES$area <- factor(ENTITIES$area, levels =c(
 
 
 #I select the columns in the order I want (the order in Metadata)
-ENTITIES <- ENTITIES %>% select(id.entity, id.bor, name, cf.piva, type.subject, dummy.info, sex, range.age, age, solvency.pf, income.pf, type.pg, status.pg, date.cessation, city, province, region, area, flag.imputed)
+ENTITIES <- ENTITIES %>% select(id.entity, name, cf.piva, type.subject, dummy.info, sex, range.age, age, solvency.pf, income.pf, type.pg, status.pg, date.cessation, city, province, region, area, flag.imputed)
 
