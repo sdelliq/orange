@@ -93,22 +93,23 @@ possiblePKs <- function(df){
 ###-----------------------------------------------------------------------###
 #-----                Entity Table Functions                        -----         
 ###-----------------------------------------------------------------------###
+library(dplyr)
+
 add_age_column <- function(data) {
   result <- data %>%
     mutate(
-      is_individual = !is.na(type.subject) & type.subject == "individual",
-      age = ifelse(
-        is_individual,
-        with(data, {
-          year_of_birth <- as.numeric(stringr::str_sub(cf.piva[is_individual], start = 7L, end = 8L))
+      is_individual = nchar(cf.piva) == 16,
+      age = case_when(
+        is_individual ~ {
+          year_of_birth <- as.numeric(stringr::str_sub(cf.piva, start = 7L, end = 8L))
           current_year <- as.numeric(format(Sys.Date(), "%Y"))
           ifelse(
             year_of_birth >= 0 & year_of_birth <= (current_year - 2018),
             current_year - (2000 + year_of_birth),
             current_year - (1900 + year_of_birth)
           )
-        }),
-        NA
+        },
+        TRUE ~ NA_real_
       )
     ) %>%
     select(-is_individual)
