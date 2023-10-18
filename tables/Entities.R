@@ -40,9 +40,9 @@ GEO.metadata <- GEO.metadata %>% mutate_all(tolower)
 
 #I first check if there are cities with the same name in different provinces/regions - I saved the result in a list, since I don't think it's worth re.running.
 # repeated_cities <- GEO.metadata %>%
-#   group_by(city) %>%
-#   summarise(unique_provinces = n_distinct(province)) %>%
-#   filter(unique_provinces > 1)
+#    group_by(city) %>%
+#    summarise(unique_provinces = n_distinct(province)) %>%
+#    filter(unique_provinces > 1)
 
 repeated_cities = c("calliano", "castro", "livo", "peglio", "samone", "san teodoro")
 if(any(ENTITIES$city %in% repeated_cities)){
@@ -51,11 +51,12 @@ if(any(ENTITIES$city %in% repeated_cities)){
 
 # Merge specific columns from 'city_info' into 'ENTITIES'
 ENTITIES <- ENTITIES %>%
-  left_join(GEO.metadata %>% select(city, province, region, area), by = c("city" = "city"))
+  left_join(GEO.metadata %>% select(city, province, region, area), by = "city")
 
+ENTITIES <- ENTITIES %>% distinct()
 #This were the cities with repeated name
-ENTITIES <- ENTITIES %>%
-  filter(!(city == "san teodoro" & province == "sassari"))
+ENTITIES <- ENTITIES[!(ENTITIES$city == "san teodoro" & ENTITIES$province == "sassari"), ]
+
 
 #It was only selected to check when duplicated
 ENTITIES <- ENTITIES %>% select(!or.province)
