@@ -1,13 +1,20 @@
 #Counterparties must be ran first
 
 #Creates the dataframe with the id.bor and cf.piva column, with unique values
-ENTITIES <- bind_rows(w_id.bor_cf.piva_borrower, w_id.bor_cf.piva_coOwner, w_id.bor_cf.piva_guarantor) %>% distinct()
+ENTITIES <- bind_rows(w_id.bor_cf.piva_borrower, w_id.bor_cf.piva_coOwner, w_id.bor_cf.piva_guarantor) 
+
+ENTITIES <- ENTITIES %>% 
+  group_by(cf.piva) %>%
+    summarise(
+      id.bor = paste(id.bor, collapse = ",")
+    )
+
 
 # id_entity: character created as e1/e2/etc
 ENTITIES$id.entity <- paste0("e", seq_len(nrow(ENTITIES)))
 
 #Get more info from Borrowers
-ENTITIES <- ENTITIES %>% left_join(original.BorrowerData %>% select(id.bor=NDG, type.subject=`Registry type`, city=`Borrower town`, or.province=`Borrower Province`), by= "id.bor")
+ENTITIES <- ENTITIES %>% left_join(original.BorrowerData %>% select(id.bor=ndg, type.subject=`registry type`, city=`borrower town`, or.province=`borrower province`), by= "id.bor")
 ENTITIES <- ENTITIES %>% mutate_all(tolower)
 
 #age: number taken from the codice fiscale
@@ -54,9 +61,9 @@ ENTITIES <- ENTITIES %>%
   left_join(GEO.metadata %>% select(city, province, region, area), by = "city")
 
 ENTITIES <- ENTITIES %>% distinct()
-#This were the cities with repeated name
-ENTITIES <- ENTITIES[!(ENTITIES$city == "san teodoro" & ENTITIES$province == "sassari"), ]
-
+#This were the rows of the cities with repeated name
+indices_to_delete <- which(ENTITIES$city == 'san teodoro' & ENTITIES$province == 'sassari')
+ENTITIES <- ENTITIES[-indices_to_delete,]
 
 #It was only selected to check when duplicated
 ENTITIES <- ENTITIES %>% select(!or.province)
@@ -89,4 +96,5 @@ ENTITIES$area <- factor(ENTITIES$area, levels =c(
 
 
 #I select the columns in the order I want (the order in Metadata)
-ENTITIES <- ENTITIES %>% select(id.entity, name, cf.piva, type.subject, dummy.info, sex, range.age, age, solvency.pf, income.pf, type.pg, status.pg, date.cessation, city, province, region, area, flag.imputed)
+ENTITIES <- ENTITIES %>% select(id.entity, id.bor, name, cf.piva, type.subject, dummy.info, sex, range.age, age, solvency.pf, income.pf, type.pg, status.pg, date.cessation, city, province, region, area, flag.imputed)
+

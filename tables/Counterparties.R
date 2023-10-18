@@ -6,16 +6,15 @@ original.GuaranteesData <- deleteXrowsAndRenameColumns(4, original.GuaranteesDat
 
 #Creating the borrower, coOwner and guarantor tables only with id.bor and cf.piva
 w_id.bor_cf.piva_borrower <- original.BorrowerData %>% 
-  mutate(cf.piva = coalesce(`Fiscal Code`, `VAT number`)) %>% select (id.bor = NDG, cf.piva)
+  mutate(cf.piva = coalesce(`fiscal code`, `vat number`)) %>% select (id.bor = ndg, cf.piva)
 w_id.bor_cf.piva_coOwner <- original.CoOwnersData %>% 
-  mutate(cf.piva = coalesce(`Co-owner Fiscal Code`, `Co-owner VAT number`)) %>% select (id.bor = NDG, cf.piva)
+  mutate(cf.piva = coalesce(`co-owner fiscal code`, `co-owner vat number`)) %>% select (id.bor = ndg, cf.piva)
 w_id.bor_cf.piva_guarantor <- original.GuarantorsData %>% 
-  mutate(cf.piva = coalesce(`Guarantor Fiscal Code`, `Guarantor VAT number`)) %>% select (id.bor = `Guarantor Id No.`, cf.piva)
+  mutate(cf.piva = coalesce(`guarantor fiscal code`, `guarantor vat number`)) %>% select (id.bor = `guarantor id no.`, cf.piva)
 
 #Creating the borrowers table
-borrowers.and.coOwners <- bind_rows(w_id.bor_cf.piva_borrower, w_id.bor_cf.piva_coOwner)
-#Not keeping duplicates
-borrowers.and.coOwners <- distinct(borrowers.and.coOwners, id.bor, cf.piva)
+borrowers.and.coOwners <- bind_rows(w_id.bor_cf.piva_borrower, w_id.bor_cf.piva_coOwner) %>% distinct()
+
 #Creating the counterparties table
 COUNTERPARTIES <- bind_rows(
   mutate(w_id.bor_cf.piva_guarantor, role = factor('guarantor', levels = c('borrower', 'guarantor', 'other'))),
@@ -26,7 +25,7 @@ count_entities <- function(x) as.integer(str_count(x, ',') + 1)
 # Group counterparties and create n.entities 
 COUNTERPARTIES <- COUNTERPARTIES %>%
   group_by(id.bor, role) %>%
-  summarize(cf.piva = paste(cf.piva, collapse = ","), n.entities = count_entities(cf.piva))
+    summarize(cf.piva = paste(cf.piva, collapse = ","), n.entities = count_entities(cf.piva))
 #Adding the id.counterparty column
 COUNTERPARTIES$id.counterparty <- paste0("c", seq_len(nrow(COUNTERPARTIES)))    
 
