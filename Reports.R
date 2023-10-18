@@ -12,7 +12,12 @@ r.introductionP6 <- LOANS %>%
   
 
 italy_sf <- ENTITIES$area 
-GBV_percentage_byArea <- ENTITIES %>% select(id.entity)
+GBV_percentage_byArea <- ENTITIES %>% select(id.entity, area) %>%
+  left_join(link.counterparties.entities, by = "id.entity") %>%
+  left_join(link.loans.counterparties, by = "id.counterparty") %>%
+  left_join(LOANS %>% select(id.loan, gbv.residual), by = "id.loan") %>%
+  group_by(area) %>%
+  summarise(gbv.residual = sum(gbv.residual, na.rm = TRUE))
 
 ggplot() +
   geom_sf(data = italy_sf, aes(fill = GBV_percentage), color = "white", size = 0.2) +
