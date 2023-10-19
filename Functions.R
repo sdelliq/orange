@@ -137,17 +137,15 @@ add_age_range_column <- function(data) {
 add_type_subject_column <- function(data) {
   result <- data %>%
     mutate(
-      type.subject = sapply(cf.piva, function(x) {
-        if (is.na(x)) {
-          return(NA)
-        } else if (any(stringr::str_detect(x, "confidi|fidi"))) {
-          return("confidi")
-        } else if (stringr::str_length(x) == 10) {
-          return("corporate")
-        } else {
-          return("individual")
-        }
-      })
+      type.subject = ifelse(
+        is.na(cf.piva), 
+        type.subject,  # Keep old value
+        ifelse(
+          stringr::str_length(cf.piva) < 14, # Le doy una chance a los boludos a poner menos numeros para el CF y mas para la piva
+          "corporate", 
+          "individual"
+        )
+      )
     )
   
   return(result)
