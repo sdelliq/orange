@@ -1,4 +1,6 @@
-message(n_distinct(LOANS$id.bor))
+###-----------------------------------------------------------------------###
+#-----                     Page 6 report                                 -----         
+###-----------------------------------------------------------------------###
 
 # #Borrowers, #Loans, GBV(m), Average Borrower size(k), Average loan size (k)
 r.introductionP6 <- LOANS %>% 
@@ -11,12 +13,15 @@ r.introductionP6 <- LOANS %>%
   )
   
 
+###-----------------------------------------------------------------------###
+#-----                     Page 27 map                                   -----         
+###-----------------------------------------------------------------------###
 italy_sf <- ENTITIES$area 
-GBV_percentage_byArea <- ENTITIES %>% select(id.entity, region, area) %>%
+GBV_percentage_byArea <- ENTITIES %>% select(id.entity, area) %>%
   left_join(link.counterparties.entities, by = "id.entity") %>%
   left_join(link.loans.counterparties, by = "id.counterparty") %>%
   left_join(LOANS %>% select(id.loan, gbv.residual), by = "id.loan") %>%
-  group_by(area, region) %>%
+  group_by(area) %>%
   summarise(gbv.residual = sum(gbv.residual, na.rm = TRUE))
 GBV_percentage_byArea <- transform(GBV_percentage_byArea, gbv_percentage = gbv.residual / sum(gbv.residual, na.rm = TRUE) * 100)
 
@@ -57,3 +62,52 @@ ggplot() +
   geom_sf(data = sf_data, aes(fill = gbv.residual / sum(gbv.residual, na.rm = TRUE))) +
   scale_fill_gradient(low = "lightblue", high = "darkblue", name = "GBV %") +
   labs(title = "GBV Percentage by Region")
+
+
+
+
+
+
+
+
+###-----------------------------------------------------------------------###
+#-----                     Page 27 second graph                        -----         
+###-----------------------------------------------------------------------###
+Borrowers <- COUNTERPARTIES %>% filter(role=='borrower') %>% distinct()
+Borrowers <- left_join(Borrowers,LOANS, by = "id.bor",relationship = "many-to-many")
+Borrowers <- left_join(Borrowers,link.counterparties.entities,by = "id.counterparty",relationship = "many-to-many")
+Borrowers <- left_join(Borrowers,ENTITIES, by = "id.entity")
+
+
+# GBV_percentage_byProvince <- Borrowers %>% ungroup() %>% select(id.loan, gbv.residual, province) %>%
+#   group_by(province) %>%
+#   summarise(
+#     `gbv (m)` = round(sum(gbv.residual) / 1e6, 1)
+#   )%>% arrange(desc(`gbv (m)`))
+
+Borrowers_area <- Borrowers %>% select(id.counterparty,gbv.residual,or.province) %>% distinct()
+
+# Borrowers_area_table <- Borrowers_area %>% mutate(area = ifelse(area == "ISLANDS", "SOUTH", area)) %>% 
+#   group_by(area)  %>%
+#   summarise(perc_borrowers = n_distinct(id.counterparty)/total_borrowers,
+#             perc_gbv = sum(gbv.original)/total_gbv)
+
+Borrowers_province_table <- Borrowers_area %>% group_by(or.province) %>% 
+  summarise(sum_gbv = sum(gbv.residual), N_borr = n_distinct(id.counterparty), avg_size = sum_gbv/N_borr ) %>% 
+  arrange(desc(sum_gbv))
+# the top 5 are Roma (rm), Teramo(te), Pescara(pe) ,Milano (mi), Genova (ge)
+Top_5_province_by_gbv <- Borrowers_province_table[1:5, ]
+
+
+GBV_percentage_byProvince <- ENTITIES %>% select(id.entity, province) %>%
+  left_join(link.counterparties.entities, by = "id.entity") %>%
+  left_join(link.loans.counterparties, by = "id.counterparty") %>%
+  left_join(LOANS %>% select(id.loan, id.bor, gbv.residual), by = "id.loan") %>%
+  group_by(province) %>%
+    summarise(
+      `gbv (m)` = round(sum(gbv.residual) / 1e6, 1)#,
+      # `# Borrowers` = n_distinct(id.bor),
+      # `Avg. Borrower Size (k)` = round(sum(gbv.residual)/n() / 1e3, 1),
+  ) %>% arrange(desc(`gbv (m)`))
+r.top_five_gbv <- head(GBV_percentage_byProvince, 5)
+
