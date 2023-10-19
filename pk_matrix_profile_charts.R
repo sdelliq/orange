@@ -1,6 +1,43 @@
 source("Functions_updated.R")
 source("Library.R")
 
+###------------------------------------------###
+#---   test loans-counterparties link      -----
+###------------------------------------------###
+#i separate the counterparties table into two according to the role (borrower, guarantor)
+TRY <- COUNTERPARTIES
+TRY_bor <- TRY
+TRY_gua <- TRY
+TRY_bor <- TRY_bor %>%
+  filter(role == "borrower")
+TRY_gua <- TRY_gua %>%
+  filter(role == "guarantor")
+TRY_gua <- TRY_gua %>% rename("id.guar" ="id.bor")
+
+#i merge the guarantor part with the table guarantees to get the id.loan associated to guarantors
+GUARANTEES <- original.GuaranteesData %>% rename("id.loan" = 'loan id no.', "id.guar" ="guarantor id no.")
+
+merge_guarantees <- merge(TRY_gua, 
+                          GUARANTEES[,c("id.guar", "id.loan")], by = "id.guar", all.x= TRUE)
+merge_guarantees <- merge_guarantees %>% rename("id.bor" ="id.guar")
+
+#i merge the borrower part with the loans table through the id.bor to get the id.loan for the borrowers
+merge_borr <- merge(TRY_bor, 
+                          LOANS[,c("id.bor", "id.loan")], by = "id.bor", all.x= TRUE)
+
+#i merge the two parts and do distinct to avoud duplicates
+merge_guar_borr <- merge_borr %>% rbind(merge_guarantees)
+link_count_loans <- merge_guar_borr %>% select(id.counterparty, id.loan)
+link.counterparties.loans <- link_count_loans %>% distinct()
+
+
+
+
+
+
+
+
+
 
 ###------------------------------------------###
 #---         Check primary keys       -----
@@ -53,8 +90,8 @@ COUNTERPARTIES_matrix_rounded  <- COUNTERPARTIES_matrix_rounded %>% as.data.fram
 column_sums_ones <- sapply(COUNTERPARTIES_matrix_rounded, function(col) sum(col == 1))
 
 COUNTERPARTIES_matrix_rounded <- rbind(COUNTERPARTIES_matrix_rounded, column_sums_ones) 
-rownames(COUNTERPARTIES_matrix_rounded)[9] <- 'Sum_ones'
-COUNTERPARTIES_matrix_rounded <- COUNTERPARTIES_matrix_rounded[c(9, 1:8), ]
+rownames(COUNTERPARTIES_matrix_rounded)[8] <- 'Sum_ones'
+COUNTERPARTIES_matrix_rounded <- COUNTERPARTIES_matrix_rounded[c(8, 1:7), ]
 
 COUNTERPARTIES_matrix_ordered <- as.matrix(COUNTERPARTIES_matrix_rounded)
 col_index <- order(COUNTERPARTIES_matrix_ordered[1,],  decreasing = TRUE)
@@ -65,7 +102,7 @@ COUNTERPARTIES_matrix_ordered <- COUNTERPARTIES_matrix_ordered[,col_index]
 #########################################
 ##---      Profiling     ---##
 #########################################
-
+#abbellire i profiles
 #non numeric profile LOANS
 Profile_LOANS <- ExpData(data=LOANS,type=2) %>% as.data.frame()
 Profile_LOANS <- Profile_LOANS %>%
@@ -83,6 +120,8 @@ plot1[[1]]
 Profile_COUNTERPARTIES <- ExpData(data=COUNTERPARTIES,type=2) %>% as.data.frame()
 
 
+
+
 #########################################
 ##---      charts and tables    ---##
 #########################################
@@ -98,6 +137,9 @@ r.introductionP6 <- LOANS %>%
   )
 
 
+
+
+################################################################# OK
 #gbv ranges chart
 gbv_ranges <- c(0, 5000, 10000, 25000, 50000, Inf)  # Define the age ranges
 gbv_labels <- c("0-5k", "5k-10k", "10k-25k", "25k-50k", "+50k")  # Define labels for the ranges
@@ -118,7 +160,8 @@ chart_range_gbv
 
 
 
-
+#borrower % per area chart
+#first we have to merge the data in order to obtain the role for borrowers from the counterparties table
 merged1 <- merge(link.counterparties.entities, 
                                    ENTITIES[,c("id.entity", "cf.piva", "area")], by = "id.entity", all.x= TRUE)
 
@@ -132,15 +175,142 @@ total.borrowers <- sum(merged2 %>% summarize(total = nrow(.)) %>% pull(total))
 summar <- merged2 %>% select(id.entity, area) %>% group_by(area) %>% 
   summarise("Borrower %" = round( n_distinct(id.entity) / total.borrowers *100, 2))
 
-chart_borr <- ggplot(summar, aes(x = range.gbv, y = `GBV %`)) +
+chart_borr <- ggplot(summar, aes(x = area, y = `Borrower %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
-  labs(x = "GBV Ranges", y = "GBV %", title= "GBV Residual % per GBV Range") + 
-  geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
+  labs(x = "Area", y = "Borrowers %", title= "Borrowers % per Area") + 
+  geom_text(aes(label = `Borrower %`), vjust = 2.5, size = 5)
 chart_borr
 
 
 
 
+original.GuaranteesData <- deleteXrowsAndRenameColumns(4, original.GuaranteesData)
+colnames(original.GuaranteesData) <- clean_column_names(colnames(original.GuaranteesData))
+
+##################################################### OK
+#gbv % per guaranteed and no guaranteed
+GUARANTEES <- original.GuaranteesData %>% rename("id.loan" = 'loan.id.no')
+
+loans_guarantees <- merge(LOANS, 
+                      GUARANTEES[,c("id.loan", "guarantee.type")], by = "id.loan", all.x= TRUE)
+
+df <- loans_guarantees
+df <- df %>%
+  distinct(id.loan, .keep_all = TRUE)
+df$guarantee.presence <- ifelse(!is.na(df$guarantee.type), "Guaranteed", "Not Guaranteed")
+
+total.gbv <- sum(df$gbv.residual)
+summar <- df %>% select(gbv.residual, guarantee.presence) %>% group_by(guarantee.presence) %>% 
+  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 2))
+
+chart_guarantee_presence_gbv <- ggplot(summar, aes(x = guarantee.presence, y = `GBV %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  labs(x = "Guarantee Presence ", y = "GBV %", title= "GBV Residual % per Guarantee Presence") + 
+  geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
+chart_guarantee_presence_gbv
+
+
+
+
+#gbv % per guarantee type chart
+df1 <- df %>%
+  filter(guarantee.presence == "Guaranteed")
+total.gbv <- sum(df1$gbv.residual)
+summar <- df1 %>% select(gbv.residual, guarantee.type) %>% group_by(guarantee.type) %>% 
+  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 2))
+
+chart_guarantee_type_gbv <- ggplot(summar, aes(x = guarantee.type, y = `GBV %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  labs(x = "Guarantee Type", y = "GBV %", title= "GBV Residual % per Guarantee Type") + 
+  geom_text(aes(label = `GBV %`), vjust = 1, size = 5)
+chart_guarantee_type_gbv
+
+
+#GBV by province chart
+
+city_counts <- df %>%
+  group_by(province) %>%
+  summarize(ObservationCount = n()) %>%
+  arrange(desc(ObservationCount))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#merge entities - coordinates by region
+#merge merged - Italy by closest coordinates
+coordinates <- data.frame(
+  region = c("lazio", "marche", "toscana", "umbria", "sardegna", "sicilia",
+             "emilia romagna", "friuli venezia giulia", "trentino alto adige", "veneto",
+             "liguria", "lombardia", "piemonte", "valle d'aosta", "abruzzo", 
+             "basilicata", "calabria", "campania", "molise", "puglia"),
+  latitude = c(41.9028, 43.6168, 43.7711, 42.9384, 39.2153, 37.5994,
+               44.4944, 45.9636, 46.6062, 45.4349, 44.4072, 45.4642, 
+               45.0735, 45.7386, 42.3512, 40.5735, 39.3088, 38.1157, 
+               41.4635, 40.8518),
+  longitude = c(12.4964, 13.5189, 11.2486, 12.5047, 9.1106, 14.0154,
+                11.3426, 13.0439, 11.1228, 12.3385, 8.9334, 9.1900, 
+                7.8479, 7.3206, 13.4075, 15.3714, 16.1910, 16.3297, 
+                14.1900, 17.0465)
+)
+
+
+merged <- merge(coordinates, 
+                 ENTITIES[,c("region", "area")], by = "region", all.x= TRUE)
+
+world <- map_data("world")
+italy <- subset(world, region == "Italy")
+
+spdf1 <- SpatialPointsDataFrame(coords = merged[, c("longitude", "latitude")], data = merged)
+spdf2 <- SpatialPointsDataFrame(coords = italy[, c("long", "lat")], data = italy)
+
+# Calculate pairwise distances
+dist_matrix <- spDists(spdf1, spdf2)
+
+# Find the indices of the closest points in df2 for each point in df1
+closest_indices <- apply(dist_matrix, 1, which.min)
+
+# Merge the data frames based on the closest coordinates
+merged_df <- cbind(merged, italy[closest_indices, ])
+
+cleaned <- merged_df %>% rename("regione"="region")
+cleaned <- cleaned %>% select(-long,-lat)
+
+
+
+italymap <- ggplot(merged_df, aes(x = long, y = lat)) +
+  geom_path() +
+  scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
+  scale_y_continuous(limits = c(35, 48))  +
+  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black")
+
+italymap <- ggplot(cleaned, aes(x = longitude, y = latitude)) +
+  geom_path(aes(group = group), color = "blue") +
+  scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
+  scale_y_continuous(limits = c(35, 48)) +
+  geom_polygon(aes(group = group), fill = "white", color = "black")
+
+italymap
 
 
 
@@ -160,23 +330,72 @@ coordinates <- data.frame(
                 14.1900, 17.0465)
 )
 
+my_sf <- st_as_sf(coordinates, coords = c('longitude', 'latitude'), crs= 4326)
 
 
 world <- map_data("world")
 italy <- subset(world, region == "Italy")
+
+italymap <- ggplot() +
+  geom_path(data = italy, aes(x = long, y = lat, group = group), color = "black") +
+  geom_polygon(data = italy, aes(x = long, y = lat, group = group), fill = "white") +
+  geom_point(data = merged, aes(x = longitude, y = latitude), color = "blue", size = 3)
+
+# Set longitude and latitude limits to focus on Italy
+italymap <- italymap +
+  scale_x_continuous(limits = c(5, 20)) +
+  scale_y_continuous(limits = c(35, 48))
+
+italymap
 
 # Create a ggplot with a map of Italy
 italymap <- ggplot(italy, aes(x = long, y = lat, group = group)) +
   geom_path() +
   scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
   scale_y_continuous(limits = c(35, 48))  +
-  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black")
+  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black") + 
+  geom_point(coordinates, aes(x= longitude, y = latitude, fill= "blue"))
 
   italymap
   # Print the map of Italy
   
-italy_map <- italymap + geom_polygon(data = coordinates, aes(x = long, y = lat, group = group))
+#italy_map <- italymap + geom_polygon(data = coordinates, aes(x = long, y = lat, group = group))
   
+
+ggplot(merged_df) +
+  geom_sf(color = "blue", aes(fill = area)) +
+  theme(legend.position = "none")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
