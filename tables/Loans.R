@@ -1,12 +1,4 @@
-
-#Deletes up to the 4th row and renames the columns. also deletes the 5th (name in italian) 
-original.LoansData <- deleteXrowsAndRenameColumns(4, original.LoansData) #PK: NDG unique 100%
-
-#Cleans the column names and gives all of them to the same name convention
-colnames(original.LoansData) <- clean_column_names(colnames(original.LoansData))
-
-#Puts the whole df in lowercase
-original.LoansData <- original.LoansData %>% mutate_all(tolower)
+#Remember to run the cleaning first
 
 #Creates the LOANS dataframe with the columns it should have and its corresponding types
 LOANS <- original.LoansData %>% select (loan.id.no, ndg, type.of.product, loan.status, gross.book.value.a.b.c, principal.a, delay.compensation.b, collection.expenses.c, intrum.acquisition.date, date.of.default)
