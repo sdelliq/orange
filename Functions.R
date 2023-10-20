@@ -90,6 +90,41 @@ possiblePKs <- function(df){
   return(PK)
 }
 
+#Compares one given column with the rest of the columns on the given dataframe and returns a one row df with the functional dependencies
+functionalDependencies_Of_Column <- function(df, column_to_asses) {
+  result <- df %>%
+    group_by_at(vars(column_to_asses)) %>%
+    summarize(across(everything(), ~n_distinct(.x), .names = "{.col}"), .groups = "drop") 
+  result <- result %>% summarize(across(-1, ~ nrow(result)/sum(.))) %>% 
+    mutate(!!column_to_asses := 1)
+  return (result)
+}
+# Running example:
+# result <- functionalDependencies_Of_Column(df, column_to_asses)
+
+
+#Creates a matrix with the functional dependencies of the whole dataframe
+functionalDependencies_Matrix <- function(df) {
+  column_names <- names(df)
+  # Create an empty matrix with rows and columns named after the columns of the dataframe
+  fd_matrix <- matrix(0, nrow = length(column_names), ncol = length(column_names), dimnames = list(column_names, column_names))
+  for (column in colnames(df)){
+    results <- functionalDependencies_Of_Column(df, column)
+    for (row in colnames(results) ){
+      fd_matrix[row, column] <- as.numeric(results[row])
+    }
+  }
+  #Creates a row with the sum of what we're certain are functional dependencies
+  certain_functional_dependencies <- apply(fd_matrix, 2, function(x) {
+    sum(x == 1)
+  })
+  fd_matrix <- rbind(certain_functional_dependencies, fd_matrix) %>% round(digits = 2)
+}
+# Running example:
+#matrix_fd <- functionalDependencies_Matrix(LOANS)
+
+
+
 ###-----------------------------------------------------------------------###
 #-----                Entity Table Functions                        -----         
 ###-----------------------------------------------------------------------###

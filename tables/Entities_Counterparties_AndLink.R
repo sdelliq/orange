@@ -1,12 +1,16 @@
-#Counterparties <- rbind(m.Guarantor,m.CoOwners)  
+
+
+filtered_m_CoOwners <- m.CoOwners %>%
+  filter(!(id.bor %in% m.Borrower$id.bor & cf.piva %in% m.Borrower$cf.piva))
 
 staging_entities_counterparties <- bind_rows(
   mutate(m.Borrower %>% select(id.bor, cf.piva, type.subject, city, province), role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
-  mutate(m.CoOwners %>% distinct(), role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
-  mutate(m.Guarantor %>% distinct(), role = factor('guarantor', levels = c('borrower', 'guarantor', 'other')))
+  mutate(filtered_m_CoOwners, role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
+  mutate(m.Guarantor, role = factor('guarantor', levels = c('borrower', 'guarantor', 'other')))
 )
 staging_entities_counterparties <- staging_entities_counterparties %>% distinct()
-
+            
+staging_entities_counterparties <- add_type_subject_column(staging_entities_counterparties)
 
 count_entities <- function(x) as.integer(str_count(x, ',') + 1)
 # Group counterparties and create n.entities 
@@ -19,12 +23,31 @@ staging_entities_counterparties <- staging_entities_counterparties %>%
     city = first(city),
     province = first(province),
     .groups = 'drop') 
-#Adding the id.counterparty column
+
+staging_entities_counterparties <- staging_entities_counterparties %>%
+  group_by(cf.piva) %>%
+  summarize(
+    id.bor = paste(id.bor, collapse = ","), 
+    n.entities = first(n.entities),
+    type.subject = first(type.subject),
+    city = first(city),
+    province = first(province),
+    role=first(role),
+    .groups = 'drop') 
+
 staging_entities_counterparties$id.counterparty <- paste0("c", seq_len(nrow(staging_entities_counterparties)))    
+staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, id.bor, ",")
+staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, cf.piva, ",")
+
+staging_entities_counterparties <- staging_entities_counterparties %>%
+  mutate(id.entity = group_indices(., cf.piva, type.subject, city))
+
+#Creation of the link.entities.counterparties table
+link.counterparties.entities <- staging_entities_counterparties %>% select(id.counterparty,id.entity)
 
 #Creating the counterparties table
-COUNTERPARTIES <- staging_entities_counterparties
-
+COUNTERPARTIES <- staging_entities_counterparties %>% select (id.counterparty, id.bor, role, n.entities)
+COUNTERPARTIES <- COUNTERPARTIES %>% distinct()
 COUNTERPARTIES <- COUNTERPARTIES %>%
   mutate(
     name= NA,
@@ -32,16 +55,10 @@ COUNTERPARTIES <- COUNTERPARTIES %>%
     flag.imputed = NA
   )
 
-#I select the columns in the order I want them to be (according to the Metadata) 
-COUNTERPARTIES <- COUNTERPARTIES %>% select (id.counterparty, id.bor, id.group, role, name, n.entities, flag.imputed)
 
-#Creation of the Entities table
-ENTITIES <- divide_column_by_character(staging_entities_counterparties,"cf.piva",",")
-ENTITIES <- ENTITIES  %>% mutate(id.entity = paste0("e",row_number()))
-
-#Creation of the link.entities.counterparties table
-link.counterparties.entities <- ENTITIES %>% select(id.counterparty,id.entity)
-ENTITIES <- ENTITIES %>% select(-id.counterparty)
+#Creation of the entities table
+ENTITIES <- staging_entities_counterparties %>% select (id.entity, cf.piva, type.subject, city, province)
+ENTITIES <- ENTITIES %>% distinct()
 
 #age: number taken from the codice fiscale
 ENTITIES <- add_age_column(ENTITIES)
