@@ -126,6 +126,9 @@ Profile_COUNTERPARTIES <- ExpData(data=COUNTERPARTIES,type=2) %>% as.data.frame(
 ##---      charts and tables    ---##
 #########################################
 
+###-----------------------------------------------------------------------###
+#-----                     Page 6 report                                 -----         
+###-----------------------------------------------------------------------###
 #summary table for totals
 r.introductionP6 <- LOANS %>% 
   summarise(
@@ -136,10 +139,51 @@ r.introductionP6 <- LOANS %>%
     'Average loan size (k)' = round(sum(gbv.residual) / n_distinct(id.loan) / 1e3, 1)  # Round average loan size to 2 decimal places and convert to thousands
   )
 
+###-----------------------------------------------------------------------###
+#-----                     Page 27 reports                                -----         
+###-----------------------------------------------------------------------###
+Borrowers <- COUNTERPARTIES %>% filter(role=='borrower') %>% distinct()
+Borrowers <- left_join(Borrowers,LOANS, by = "id.bor",relationship = "many-to-many")
+Borrowers <- left_join(Borrowers,link.counterparties.entities,by = "id.counterparty",relationship = "many-to-many")
+Borrowers <- left_join(Borrowers,ENTITIES, by = "id.entity")
+
+#% Borrowers by areas 
+total.gbv <- sum(LOANS$gbv.residual)
+r.p27.geographicalDistribution <- Borrowers %>%
+  mutate(area = ifelse(area %in% c("islands", "south"), "south and islands", area)) %>%
+  select(id.entity, area, gbv.residual) %>%
+  group_by(area) %>%
+  summarise("Borrower %" = round(n_distinct(id.entity) / total.borrowers * 100, 1),
+            "GBV %" = round(sum(gbv.residual) / total.gbv * 100, 1)
+            )
+r.p27.borrowerByArea <- ggplot(r.p27.geographicalDistribution, aes(x = area, y = `Borrower %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  labs(x = "Area", y = "Borrowers %", title= "Borrowers % per Area") + 
+  geom_text(aes(label = `Borrower %`), vjust = 2.5, size = 5)
+r.p27.borrowerByArea
+
+r.p27.gbvByArea <- ggplot(r.p27.geographicalDistribution, aes(x = area, y = `GBV %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  labs(x = "Area", y = "GBV %", title= "GBV % per Area") + 
+  geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
+r.p27.gbvByArea
+
+#GBV by borrower province
+r.p27.borrowersByProvince <- Borrowers %>% select(id.counterparty,gbv.residual,or.province) %>% distinct() %>% 
+  group_by(or.province) %>% 
+  summarise(sum_gbv = round(sum(gbv.residual)/ 1e6, 1), 
+            N_borr = n_distinct(id.counterparty), 
+            avg_size = round( sum(gbv.residual)/N_borr / 1e3, 1)) %>% 
+  arrange(desc(sum_gbv))
+# the top 5 are Roma (rm), Teramo(te), Pescara(pe) ,Milano (mi), Genova (ge)
+r.p27.borrowersByProvince.head <- head(r.p27.borrowersByProvince, 5)
 
 
 
-################################################################# OK
+###-----------------------------------------------------------------------###
+#-----                     Page 28 report                                -----         
+###-----------------------------------------------------------------------###
+
 #gbv ranges chart
 gbv_ranges <- c(0, 5000, 10000, 25000, 50000, Inf)  # Define the age ranges
 gbv_labels <- c("0-5k", "5k-10k", "10k-25k", "25k-50k", "+50k")  # Define labels for the ranges
@@ -149,43 +193,22 @@ df <- LOANS
 df$range.gbv <- cut(df$gbv.residual, breaks = gbv_ranges, labels = gbv_labels, include.lowest = TRUE)
 total.gbv <- sum(df %>% group_by(range.gbv) %>% summarize(total = sum(gbv.residual)) %>% pull(total))
 summar <- df %>% select(gbv.residual, range.gbv) %>% group_by(range.gbv) %>% 
-  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 2))
+  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 1))
 
-chart_range_gbv <- ggplot(summar, aes(x = range.gbv, y = `GBV %`)) +
+r.p28.gbvByLoanSize <- ggplot(summar, aes(x = range.gbv, y = `GBV %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
-  labs(x = "GBV Ranges", y = "GBV %", title= "GBV Residual % per GBV Range") + 
+  labs(x = "GBV Ranges", y = "GBV %", title= "GBV Residual % by Loan Size") + 
   geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
-chart_range_gbv
+r.p28.gbvByLoanSize
+
+
+###-----------------------------------------------------------------------###
+#-----                     Page 29 report                                -----         
+###-----------------------------------------------------------------------###
+#Da fare :)
 
 
 
-
-#borrower % per area chart
-#first we have to merge the data in order to obtain the role for borrowers from the counterparties table
-merged1 <- merge(link.counterparties.entities, 
-                                   ENTITIES[,c("id.entity", "cf.piva", "area")], by = "id.entity", all.x= TRUE)
-
-merged2 <- merge(merged1, 
-                 COUNTERPARTIES[,c("id.counterparty", "role", "n.entities")], by = "id.counterparty", all.x= TRUE)
-
-merged2 <- merged2 %>%
-  filter(grepl("borrower", role, ignore.case = TRUE))
-
-total.borrowers <- sum(merged2 %>% summarize(total = nrow(.)) %>% pull(total))
-summar <- merged2 %>% select(id.entity, area) %>% group_by(area) %>% 
-  summarise("Borrower %" = round( n_distinct(id.entity) / total.borrowers *100, 2))
-
-chart_borr <- ggplot(summar, aes(x = area, y = `Borrower %`)) +
-  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
-  labs(x = "Area", y = "Borrowers %", title= "Borrowers % per Area") + 
-  geom_text(aes(label = `Borrower %`), vjust = 2.5, size = 5)
-chart_borr
-
-
-
-
-original.GuaranteesData <- deleteXrowsAndRenameColumns(4, original.GuaranteesData)
-colnames(original.GuaranteesData) <- clean_column_names(colnames(original.GuaranteesData))
 
 ##################################################### OK
 #gbv % per guaranteed and no guaranteed

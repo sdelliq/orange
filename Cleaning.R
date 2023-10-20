@@ -3,12 +3,14 @@ original.BorrowerData <- original.BorrowerData %>% mutate_all(tolower)
 original.LoansData <- original.LoansData %>% mutate_all(tolower)
 original.CoOwnersData <- original.CoOwnersData %>% mutate_all(tolower)
 original.GuarantorsData <- original.GuarantorsData %>% mutate_all(tolower)
+colnames(original.GuaranteesData) <- clean_column_names(colnames(original.GuaranteesData))
 
 #Deletes up to the 4th row and renames the columns. also deletes the 5th (name in italian) 
 original.BorrowerData <- deleteXrowsAndRenameColumns(4, original.BorrowerData) #PK: NDG unique 100%
 original.CoOwnersData <- deleteXrowsAndRenameColumns(4, original.CoOwnersData) # highest ratio Fiscal Code 98.07% - has NA
 original.GuarantorsData <- deleteXrowsAndRenameColumns(4, original.GuarantorsData) # PK: Guarantor Id No. unique 100%
 original.LoansData <- deleteXrowsAndRenameColumns(4, original.LoansData) #PK: NDG unique 100%
+original.GuaranteesData <- deleteXrowsAndRenameColumns(4, original.GuaranteesData)
 
 #Unify columns
 m.Borrower <- original.BorrowerData %>% 

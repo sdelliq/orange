@@ -3,7 +3,7 @@
 ###-----------------------------------------------------------------------###
 
 # #Borrowers, #Loans, GBV(m), Average Borrower size(k), Average loan size (k)
-r.introductionP6 <- LOANS %>% 
+r.p6.introduction <- LOANS %>% 
   summarise(
     '# Borrowers' = n_distinct(id.bor),
     '# Loans' = n_distinct(id.loan),
@@ -78,36 +78,19 @@ Borrowers <- left_join(Borrowers,LOANS, by = "id.bor",relationship = "many-to-ma
 Borrowers <- left_join(Borrowers,link.counterparties.entities,by = "id.counterparty",relationship = "many-to-many")
 Borrowers <- left_join(Borrowers,ENTITIES, by = "id.entity")
 
-
-# GBV_percentage_byProvince <- Borrowers %>% ungroup() %>% select(id.loan, gbv.residual, province) %>%
-#   group_by(province) %>%
-#   summarise(
-#     `gbv (m)` = round(sum(gbv.residual) / 1e6, 1)
-#   )%>% arrange(desc(`gbv (m)`))
-
-Borrowers_area <- Borrowers %>% select(id.counterparty,gbv.residual,or.province) %>% distinct()
-
 # Borrowers_area_table <- Borrowers_area %>% mutate(area = ifelse(area == "ISLANDS", "SOUTH", area)) %>% 
 #   group_by(area)  %>%
 #   summarise(perc_borrowers = n_distinct(id.counterparty)/total_borrowers,
 #             perc_gbv = sum(gbv.original)/total_gbv)
 
-Borrowers_province_table <- Borrowers_area %>% group_by(or.province) %>% 
-  summarise(sum_gbv = sum(gbv.residual), N_borr = n_distinct(id.counterparty), avg_size = sum_gbv/N_borr ) %>% 
-  arrange(desc(sum_gbv))
+r.p27.borrowersByProvince <- Borrowers %>% select(id.counterparty,gbv.residual,or.province) %>% distinct() %>% 
+  group_by(or.province) %>% 
+    summarise(sum_gbv = round(sum(gbv.residual)/ 1e6, 1), 
+              N_borr = n_distinct(id.counterparty), 
+              avg_size = round( sum(gbv.residual)/N_borr / 1e3, 1)) %>% 
+      arrange(desc(sum_gbv))
 # the top 5 are Roma (rm), Teramo(te), Pescara(pe) ,Milano (mi), Genova (ge)
-Top_5_province_by_gbv <- Borrowers_province_table[1:5, ]
+r.p27.borrowersByProvince.head <- head(r.p27.borrowersByProvince, 5)
 
 
-GBV_percentage_byProvince <- ENTITIES %>% select(id.entity, province) %>%
-  left_join(link.counterparties.entities, by = "id.entity") %>%
-  left_join(link.loans.counterparties, by = "id.counterparty") %>%
-  left_join(LOANS %>% select(id.loan, id.bor, gbv.residual), by = "id.loan") %>%
-  group_by(province) %>%
-    summarise(
-      `gbv (m)` = round(sum(gbv.residual) / 1e6, 1)#,
-      # `# Borrowers` = n_distinct(id.bor),
-      # `Avg. Borrower Size (k)` = round(sum(gbv.residual)/n() / 1e3, 1),
-  ) %>% arrange(desc(`gbv (m)`))
-r.top_five_gbv <- head(GBV_percentage_byProvince, 5)
 
