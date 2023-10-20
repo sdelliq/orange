@@ -8,9 +8,8 @@ staging_entities_counterparties <- bind_rows(
   mutate(filtered_m_CoOwners, role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
   mutate(m.Guarantor, role = factor('guarantor', levels = c('borrower', 'guarantor', 'other')))
 )
-staging_entities_counterparties <- staging_entities_counterparties %>% distinct()
-            
 staging_entities_counterparties <- add_type_subject_column(staging_entities_counterparties)
+staging_entities_counterparties <- staging_entities_counterparties %>% distinct()
 
 count_entities <- function(x) as.integer(str_count(x, ',') + 1)
 # Group counterparties and create n.entities 
@@ -24,23 +23,12 @@ staging_entities_counterparties <- staging_entities_counterparties %>%
     province = first(province),
     .groups = 'drop') 
 
-staging_entities_counterparties <- staging_entities_counterparties %>%
-  group_by(cf.piva) %>%
-  summarize(
-    id.bor = paste(id.bor, collapse = ","), 
-    n.entities = first(n.entities),
-    type.subject = first(type.subject),
-    city = first(city),
-    province = first(province),
-    role=first(role),
-    .groups = 'drop') 
-
 staging_entities_counterparties$id.counterparty <- paste0("c", seq_len(nrow(staging_entities_counterparties)))    
 staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, id.bor, ",")
-staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, cf.piva, ",")
 
 staging_entities_counterparties <- staging_entities_counterparties %>%
-  mutate(id.entity = group_indices(., cf.piva, type.subject, city))
+  mutate(id.entity = group_indices(., cf.piva, type.subject, city, province))
+
 
 #Creation of the link.entities.counterparties table
 link.counterparties.entities <- staging_entities_counterparties %>% select(id.counterparty,id.entity)
@@ -54,7 +42,6 @@ COUNTERPARTIES <- COUNTERPARTIES %>%
     id.group = NA,
     flag.imputed = NA
   )
-
 
 #Creation of the entities table
 ENTITIES <- staging_entities_counterparties %>% select (id.entity, cf.piva, type.subject, city, province)
@@ -113,4 +100,3 @@ indices_to_delete <- which(ENTITIES$city == 'san teodoro' & ENTITIES$province ==
 ENTITIES <- ENTITIES[-indices_to_delete,]
 #I select the columns in the order I want (the order in Metadata)
 ENTITIES <- ENTITIES %>% select(id.entity, name, cf.piva, type.subject, dummy.info, sex, range.age, age, solvency.pf, income.pf, type.pg, status.pg, date.cessation, city, or.province, province, region, area, flag.imputed)
-
