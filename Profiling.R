@@ -33,50 +33,20 @@ link.counterparties.loans <- link_count_loans %>% distinct()
 
 
 
-
-
-
-
-
-
 ###------------------------------------------###
 #---         Check primary keys       -----
 ###------------------------------------------###
 
-possible_keys_LOANS <- detect_primary_keys_NAs_perc(LOANS,number_NAs=1,percentage=0.9)
-possible_keys_COUNTERPARTIES <- detect_primary_keys_NAs_perc(COUNTERPARTIES,number_NAs=1,percentage=0.9)
-
-
-dataframes_list <- list(LOANS, COUNTERPARTIES)
-results_list <- lapply(dataframes_list, detect_primary_keys_NAs_perc, number_NAs = 1, percentage = 0.9)
-
-# Print the results
-for (i in seq_along(dataframes_list)) {
-  cat("Primary keys for", names(dataframes_list)[i], ":\n")
-  print(results_list[[i]])
-  cat("\n")
-}
-
+possible_keys_LOANS <- possiblePKs(LOANS)
+possible_keys_COUNTERPARTIES <- possiblePKs(COUNTERPARTIES)
+print(possible_keys_LOANS)
+print(possible_keys_COUNTERPARTIES)
 
 #########################################
 ##---      Check dependencies Loans    ---##
 #########################################
-LOANS_na <- LOANS %>%  mutate(across(everything(), ~ifelse(is.na(.), "-", .)))
-LOANS_matrix <- find_dependencies_matrix(LOANS_na)
-LOANS_matrix_rounded <- round(LOANS_matrix,2)
 
-# add a row with the sum of 1 (dependencies) for each column and order the matrix for better visualization:
-LOANS_matrix_rounded  <- LOANS_matrix_rounded %>% as.data.frame()
-column_sums_ones <- sapply(LOANS_matrix_rounded, function(col) sum(col == 1))
-
-LOANS_matrix_rounded <- rbind(LOANS_matrix_rounded, column_sums_ones) 
-rownames(LOANS_matrix_rounded)[19] <- 'Sum_ones'
-LOANS_matrix_rounded <- LOANS_matrix_rounded[c(19, 1:18), ]
-
-LOANS_matrix_ordered <- as.matrix(LOANS_matrix_rounded)
-col_index <- order(LOANS_matrix_ordered[1,],  decreasing = TRUE)
-LOANS_matrix_ordered <- LOANS_matrix_ordered[,col_index]
-
+LOANS_matrix <- functionalDependencies_Matrix(LOANS)
 
 #########################################
 ##---  Check dependencies COUNTERPARTIES  ---##
@@ -192,236 +162,85 @@ gbv_labels <- c("0-5k", "5k-10k", "10k-25k", "25k-50k", "+50k")  # Define labels
 df <- LOANS
 df$range.gbv <- cut(df$gbv.residual, breaks = gbv_ranges, labels = gbv_labels, include.lowest = TRUE)
 total.gbv <- sum(df %>% group_by(range.gbv) %>% summarize(total = sum(gbv.residual)) %>% pull(total))
-summar <- df %>% select(gbv.residual, range.gbv) %>% group_by(range.gbv) %>% 
+r.p28.gbvByLoanSize <- df %>% select(gbv.residual, range.gbv) %>% group_by(range.gbv) %>% 
   summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 1))
 
-r.p28.gbvByLoanSize <- ggplot(summar, aes(x = range.gbv, y = `GBV %`)) +
+r.p28.g.gbvByLoanSize <- ggplot(r.p28.gbvByLoanSize, aes(x = range.gbv, y = `GBV %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
   labs(x = "GBV Ranges", y = "GBV %", title= "GBV Residual % by Loan Size") + 
   geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
-r.p28.gbvByLoanSize
+r.p28.g.gbvByLoanSize
 
 
 ###-----------------------------------------------------------------------###
 #-----                     Page 29 report                                -----         
 ###-----------------------------------------------------------------------###
-#Da fare :)
+#gbv by default vintage
+bv_ranges <- c(0, 8, 11, 14, 17, 20, Inf)  # Define the age ranges
+gbv_labels <- c("0-8 years", "9-11 years", "12-14 years", "15-17 years", "18-20 years", "+20 years")  # Define labels for the ranges
+
+df <- LOANS
+df <- df %>%
+  mutate(vintage = floor(as.numeric(interval(date.status, as.Date("2021-11-30")) / dyears(1))))
+df$range.date <- cut(df$vintage, breaks = gbv_ranges, labels = gbv_labels, include.lowest = TRUE)
+r.p29.gbvByDefaultVintage <- df %>% select(gbv.residual, range.date) %>% group_by(range.date) %>% 
+  summarise("GBV Total (m)" = round(sum(gbv.residual)/1e6,1),
+            "GBV %" = round(sum(gbv.residual) / total.gbv *100, 1),
+            "Loans %" = round(n() / nrow(df) * 100, 1),
+            "Avg. Loan size (€k)" = round(sum(gbv.residual)/n()/1e3,1))
+
+r.p29.g.gbvByDefaultVintage <- ggplot(r.p29.gbvByDefaultVintage, aes(x = range.date, y = `GBV %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  geom_text(aes(label = paste0(`GBV %`, "%"), vjust = -0.1), size = 5) +
+  labs(x = "Year Ranges", y = "GBV %", title = "GBV By Default Vintage") +
+  ylim(0, 32) +
+  annotate("text", x = 1:6, y = rep(0, 6), label = paste0(r.p29.gbvByDefaultVintage$`GBV Total (m)`, "M"), size = 5, hjust = 0.5, vjust = -25, color = "#054A53")
+r.p29.g.gbvByDefaultVintage
+
+r.p29.g.loansByDefaultVintage <- ggplot(r.p29.gbvByDefaultVintage, aes(x = range.date, y = `Loans %`)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  geom_text(aes(label = paste0(`GBV %`, "%"), vjust = -0.1), size = 5) +
+  labs(x = "Year Ranges", y = "Loans %", title = "Loans By Default Vintage", subtitle = "and avg. loan size") +
+  ylim(0, 32) +
+  annotate("text", x = 1:6, y = rep(0, 6), label = paste0(r.p29.gbvByDefaultVintage$`Avg. Loan size (€k)`, "€k"), size = 5, hjust = 0.5, vjust = -24.5, color = "#054A53")
+r.p29.g.loansByDefaultVintage
 
 
-
-
-##################################################### OK
-#gbv % per guaranteed and no guaranteed
-GUARANTEES <- original.GuaranteesData %>% rename("id.loan" = 'loan.id.no')
-
-loans_guarantees <- merge(LOANS, 
-                      GUARANTEES[,c("id.loan", "guarantee.type")], by = "id.loan", all.x= TRUE)
-
-df <- loans_guarantees
+###-----------------------------------------------------------------------###
+#-----                     Page 31 report                                -----         
+###-----------------------------------------------------------------------###
+df <- merge(LOANS, original.GuaranteesData[,c("id.loan", "guarantee.type")], by = "id.loan", all.x= TRUE)
 df <- df %>%
   distinct(id.loan, .keep_all = TRUE)
-df$guarantee.presence <- ifelse(!is.na(df$guarantee.type), "Guaranteed", "Not Guaranteed")
+df$guarantee.presence <- ifelse(!is.na(df$guarantee.type), "guaranteed", "not guaranteed")
 
-total.gbv <- sum(df$gbv.residual)
-summar <- df %>% select(gbv.residual, guarantee.presence) %>% group_by(guarantee.presence) %>% 
-  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 2))
+r.p31.gbvByGuaranteePresence <- df %>%
+  select(gbv.residual, guarantee.presence) %>%
+  group_by(guarantee.presence) %>%
+  summarise("GBV %" = round(sum(gbv.residual) / total.gbv * 100, 2))
 
-chart_guarantee_presence_gbv <- ggplot(summar, aes(x = guarantee.presence, y = `GBV %`)) +
-  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
-  labs(x = "Guarantee Presence ", y = "GBV %", title= "GBV Residual % per Guarantee Presence") + 
-  geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
-chart_guarantee_presence_gbv
-
-
+#gbv % per guaranteed and no guaranteed
+custom_colors <- c("#054A53", "#ACDBE1")
+r.p31.g.gbvByGuaranteePresence <- ggplot(r.p31.gbvByGuaranteePresence, aes(x = "", y = `GBV %`, fill = guarantee.presence)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  labs(fill = "Guarantee Presence") +
+  theme_void() +
+  geom_text(aes(label = paste0(`GBV %`, "%")), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = custom_colors)
+r.p31.g.gbvByGuaranteePresence
 
 
 #gbv % per guarantee type chart
 df1 <- df %>%
-  filter(guarantee.presence == "Guaranteed")
-total.gbv <- sum(df1$gbv.residual)
-summar <- df1 %>% select(gbv.residual, guarantee.type) %>% group_by(guarantee.type) %>% 
-  summarise("GBV %" = round(sum(gbv.residual) / total.gbv *100, 2))
+  filter(guarantee.presence == "guaranteed")
+total.guaranteed.gbv <- sum(df1$gbv.residual)
+r.p31.gbvByGuaranteedType <- df1 %>% select(gbv.residual, guarantee.type) %>% group_by(guarantee.type) %>% 
+  summarise("GBV %" = round(sum(gbv.residual) / total.guaranteed.gbv *100, 2))
 
-chart_guarantee_type_gbv <- ggplot(summar, aes(x = guarantee.type, y = `GBV %`)) +
+r.p31.g.gbvByGuaranteedType <- ggplot(r.p31.gbvByGuaranteedType, aes(x = guarantee.type, y = `GBV %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
   labs(x = "Guarantee Type", y = "GBV %", title= "GBV Residual % per Guarantee Type") + 
   geom_text(aes(label = `GBV %`), vjust = 1, size = 5)
-chart_guarantee_type_gbv
-
-
-#GBV by province chart
-
-city_counts <- df %>%
-  group_by(province) %>%
-  summarize(ObservationCount = n()) %>%
-  arrange(desc(ObservationCount))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#merge entities - coordinates by region
-#merge merged - Italy by closest coordinates
-coordinates <- data.frame(
-  region = c("lazio", "marche", "toscana", "umbria", "sardegna", "sicilia",
-             "emilia romagna", "friuli venezia giulia", "trentino alto adige", "veneto",
-             "liguria", "lombardia", "piemonte", "valle d'aosta", "abruzzo", 
-             "basilicata", "calabria", "campania", "molise", "puglia"),
-  latitude = c(41.9028, 43.6168, 43.7711, 42.9384, 39.2153, 37.5994,
-               44.4944, 45.9636, 46.6062, 45.4349, 44.4072, 45.4642, 
-               45.0735, 45.7386, 42.3512, 40.5735, 39.3088, 38.1157, 
-               41.4635, 40.8518),
-  longitude = c(12.4964, 13.5189, 11.2486, 12.5047, 9.1106, 14.0154,
-                11.3426, 13.0439, 11.1228, 12.3385, 8.9334, 9.1900, 
-                7.8479, 7.3206, 13.4075, 15.3714, 16.1910, 16.3297, 
-                14.1900, 17.0465)
-)
-
-
-merged <- merge(coordinates, 
-                 ENTITIES[,c("region", "area")], by = "region", all.x= TRUE)
-
-world <- map_data("world")
-italy <- subset(world, region == "Italy")
-
-spdf1 <- SpatialPointsDataFrame(coords = merged[, c("longitude", "latitude")], data = merged)
-spdf2 <- SpatialPointsDataFrame(coords = italy[, c("long", "lat")], data = italy)
-
-# Calculate pairwise distances
-dist_matrix <- spDists(spdf1, spdf2)
-
-# Find the indices of the closest points in df2 for each point in df1
-closest_indices <- apply(dist_matrix, 1, which.min)
-
-# Merge the data frames based on the closest coordinates
-merged_df <- cbind(merged, italy[closest_indices, ])
-
-cleaned <- merged_df %>% rename("regione"="region")
-cleaned <- cleaned %>% select(-long,-lat)
-
-
-
-italymap <- ggplot(merged_df, aes(x = long, y = lat)) +
-  geom_path() +
-  scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
-  scale_y_continuous(limits = c(35, 48))  +
-  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black")
-
-italymap <- ggplot(cleaned, aes(x = longitude, y = latitude)) +
-  geom_path(aes(group = group), color = "blue") +
-  scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
-  scale_y_continuous(limits = c(35, 48)) +
-  geom_polygon(aes(group = group), fill = "white", color = "black")
-
-italymap
-
-
-
-
-coordinates <- data.frame(
-  region = c("lazio", "marche", "toscana", "umbria", "sardegna", "sicilia",
-             "emilia romagna", "friuli venezia giulia", "trentino alto adige", "veneto",
-             "liguria", "lombardia", "piemonte", "valle d'aosta", "abruzzo", 
-             "basilicata", "calabria", "campania", "molise", "puglia"),
-  latitude = c(41.9028, 43.6168, 43.7711, 42.9384, 39.2153, 37.5994,
-               44.4944, 45.9636, 46.6062, 45.4349, 44.4072, 45.4642, 
-               45.0735, 45.7386, 42.3512, 40.5735, 39.3088, 38.1157, 
-               41.4635, 40.8518),
-  longitude = c(12.4964, 13.5189, 11.2486, 12.5047, 9.1106, 14.0154,
-                11.3426, 13.0439, 11.1228, 12.3385, 8.9334, 9.1900, 
-                7.8479, 7.3206, 13.4075, 15.3714, 16.1910, 16.3297, 
-                14.1900, 17.0465)
-)
-
-my_sf <- st_as_sf(coordinates, coords = c('longitude', 'latitude'), crs= 4326)
-
-
-world <- map_data("world")
-italy <- subset(world, region == "Italy")
-
-italymap <- ggplot() +
-  geom_path(data = italy, aes(x = long, y = lat, group = group), color = "black") +
-  geom_polygon(data = italy, aes(x = long, y = lat, group = group), fill = "white") +
-  geom_point(data = merged, aes(x = longitude, y = latitude), color = "blue", size = 3)
-
-# Set longitude and latitude limits to focus on Italy
-italymap <- italymap +
-  scale_x_continuous(limits = c(5, 20)) +
-  scale_y_continuous(limits = c(35, 48))
-
-italymap
-
-# Create a ggplot with a map of Italy
-italymap <- ggplot(italy, aes(x = long, y = lat, group = group)) +
-  geom_path() +
-  scale_x_continuous(limits = c(5, 20)) +  # Set longitude limits to focus on Italy
-  scale_y_continuous(limits = c(35, 48))  +
-  geom_polygon(aes(x = long, y = lat, group = group), fill = "white", color = "black") + 
-  geom_point(coordinates, aes(x= longitude, y = latitude, fill= "blue"))
-
-  italymap
-  # Print the map of Italy
-  
-#italy_map <- italymap + geom_polygon(data = coordinates, aes(x = long, y = lat, group = group))
-  
-
-ggplot(merged_df) +
-  geom_sf(color = "blue", aes(fill = area)) +
-  theme(legend.position = "none")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+r.p31.g.gbvByGuaranteedType
+#custom_colors <- c("#054A53", "#ACDBE1", "#008197", "#28464B", "#003A44", "#595F60")

@@ -3,7 +3,7 @@ original.BorrowerData <- original.BorrowerData %>% mutate_all(tolower)
 original.LoansData <- original.LoansData %>% mutate_all(tolower)
 original.CoOwnersData <- original.CoOwnersData %>% mutate_all(tolower)
 original.GuarantorsData <- original.GuarantorsData %>% mutate_all(tolower)
-colnames(original.GuaranteesData) <- clean_column_names(colnames(original.GuaranteesData))
+original.GuaranteesData <- original.GuaranteesData %>% mutate_all(tolower)
 
 #Deletes up to the 4th row and renames the columns. also deletes the 5th (name in italian) 
 original.BorrowerData <- deleteXrowsAndRenameColumns(4, original.BorrowerData) #PK: NDG unique 100%
@@ -25,9 +25,10 @@ colnames(m.Borrower) <- clean_column_names(colnames(m.Borrower))
 colnames(m.CoOwners) <- clean_column_names(colnames(m.CoOwners))
 colnames(m.Guarantor) <- clean_column_names(colnames(m.Guarantor))
 colnames(original.LoansData) <- clean_column_names(colnames(original.LoansData)) 
-
+colnames(original.GuaranteesData) <- clean_column_names(colnames(original.GuaranteesData))
 
 #Changing the names of all DFs (but Loans)
 m.CoOwners <- m.CoOwners %>% rename("id.bor" = ndg)
 m.Guarantor <- m.Guarantor %>% rename("id.bor" = guarantor.id.no)
 m.Borrower <- m.Borrower %>% rename(id.bor=ndg, type.subject=`registry.type`, city=`borrower.town`, province=`borrower.province`)
+original.GuaranteesData <- original.GuaranteesData %>% rename("id.loan"= loan.id.no)
