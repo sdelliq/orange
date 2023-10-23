@@ -128,7 +128,13 @@ functionalDependencies_Matrix <- function(df) {
 ###-----------------------------------------------------------------------###
 #-----                Entity Table Functions                        -----         
 ###-----------------------------------------------------------------------###
-library(dplyr)
+clean_cf.piva <- function(column) {
+  column <- gsub(" ", "", column)
+  column <- ifelse(str_length(column) == 10, paste0(0, column), column)
+  return(column)
+}
+# Running example:
+#ENTITIES$cf.piva <- clean_cf.piva(ENTITIES$cf.piva)
 
 add_age_column <- function(data) {
   result <- data %>%
@@ -176,9 +182,10 @@ add_type_subject_column <- function(data) {
         is.na(cf.piva), 
         type.subject,  # Keep old value
         ifelse(
-          stringr::str_length(cf.piva) < 14, # Le doy una chance a los boludos a poner menos numeros para el CF y mas para la piva
-          "corporate", 
-          "individual"
+          grepl("^[A-Za-z]+$", cf.piva),
+          "individual",
+          "corporate"
+          
         )
       )
     )

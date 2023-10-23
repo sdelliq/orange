@@ -1,13 +1,14 @@
-
-
 filtered_m_CoOwners <- m.CoOwners %>%
-  filter(!(id.bor %in% m.Borrower$id.bor & cf.piva %in% m.Borrower$cf.piva))
+  select(id.bor, cf.piva) %>%
+  distinct() %>%
+  anti_join(m.Borrower, by = c("id.bor", "cf.piva"))
 
 staging_entities_counterparties <- bind_rows(
   mutate(m.Borrower %>% select(id.bor, cf.piva, type.subject, city, province), role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
   mutate(filtered_m_CoOwners, role = factor('borrower', levels = c('borrower', 'guarantor', 'other'))),
   mutate(m.Guarantor, role = factor('guarantor', levels = c('borrower', 'guarantor', 'other')))
 )
+staging_entities_counterparties$cf.piva <- clean_cf.piva(staging_entities_counterparties$cf.piva)
 staging_entities_counterparties <- add_type_subject_column(staging_entities_counterparties)
 staging_entities_counterparties <- staging_entities_counterparties %>% distinct()
 
@@ -24,11 +25,11 @@ staging_entities_counterparties <- staging_entities_counterparties %>%
     .groups = 'drop') 
 
 staging_entities_counterparties$id.counterparty <- paste0("c", seq_len(nrow(staging_entities_counterparties)))    
-staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, id.bor, ",")
+staging_entities_counterparties <- divide_column_by_character(staging_entities_counterparties, cf.piva, ",")
 
 staging_entities_counterparties <- staging_entities_counterparties %>%
-  mutate(id.entity = group_indices(., cf.piva, type.subject, city, province))
-
+  mutate(id.entity = group_indices(., coalesce(cf.piva, NA_character_), type.subject, city, province))
+# In this code, we use coalesce() to replace NA values in the cf.piva column with a special "NA" character string to ensure rows with NA values in cf.piva will be assigned unique identifiers.
 
 #Creation of the link.entities.counterparties table
 link.counterparties.entities <- staging_entities_counterparties %>% select(id.counterparty,id.entity)
