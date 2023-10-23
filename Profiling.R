@@ -42,6 +42,9 @@ possible_keys_COUNTERPARTIES <- possiblePKs(COUNTERPARTIES)
 print(possible_keys_LOANS)
 print(possible_keys_COUNTERPARTIES)
 
+possible_keys_LOANS <- possible_keys_LOANS %>% rename("NA Presence" = "Has_NA")
+possible_keys_COUNTERPARTIES <- possible_keys_COUNTERPARTIES %>% rename("NA Presence" = "Has_NA")
+
 #########################################
 ##---      Check dependencies Loans    ---##
 #########################################
@@ -77,10 +80,25 @@ COUNTERPARTIES_matrix_ordered <- COUNTERPARTIES_matrix_ordered[,col_index]
 Profile_LOANS <- ExpData(data=LOANS,type=2) %>% as.data.frame()
 Profile_LOANS <- Profile_LOANS %>%
   filter(!grepl("numeric", Variable_Type, ignore.case = TRUE))
+Profile_LOANS <- Profile_LOANS %>% rename("Variable" = "Variable_Name", "Type" = "Variable_Type",
+                                          "N Entries" = "Sample_n", "NAs" = "Missing_Count", 
+                                         "% NAs" ="Per_of_Missing", "N Classes" ="No_of_distinct_values")
+Profile_LOANS$`% NAs` <- paste0(Profile_LOANS$`% NAs` *100, "%")
+Profile_LOANS <- Profile_LOANS %>% select(-NAs)
 
 #numeric profile LOANS
 Profile_Numeric <- ExpData(data=LOANS,type=2, fun = c("mean", "median", "var")) %>% as.data.frame()
 Profile_Numeric<-Profile_Numeric[complete.cases(Profile_Numeric),]
+Profile_Numeric <- Profile_Numeric %>% rename("Variable" = "Variable_Name", "Type" = "Variable_Type",
+                                          "N Entries" = "Sample_n", "NAs" = "Missing_Count", 
+                                          "% NAs" ="Per_of_Missing", "N Classes" ="No_of_distinct_values",
+                                          "Mean (k)" = "mean", "Median (k)" = "median", "Var (M)" = "var")
+Profile_Numeric$`% NAs` <- paste0(Profile_Numeric$`% NAs` *100, "%")
+Profile_Numeric$`Mean (k)` <- round(Profile_Numeric$`Mean (k)`/1000, 2)
+Profile_Numeric$`Median (k)` <- round(Profile_Numeric$`Median (k)`/1000, 2)
+Profile_Numeric$`Var (M)` <- round(Profile_Numeric$`Var (M)`/1000000, 2)
+Profile_Numeric <- Profile_Numeric %>% select(-NAs)
+
 
 # numeric variables plot (proportion of observations per money amount)
 plot1 <- ExpNumViz(LOANS,target=NULL,nlim=10,Page=c(2,2),sample=4)
@@ -88,8 +106,10 @@ plot1[[1]]
 
 #profile for COUNTERPARTIES
 Profile_COUNTERPARTIES <- ExpData(data=COUNTERPARTIES,type=2) %>% as.data.frame()
-
-
+Profile_COUNTERPARTIES <- Profile_COUNTERPARTIES %>% rename("Variable" = "Variable_Name", "Type" = "Variable_Type",
+                                              "N Entries" = "Sample_n", "NAs" = "Missing_Count", 
+                                              "% NAs" ="Per_of_Missing", "N Classes" ="No_of_distinct_values")
+Profile_COUNTERPARTIES$`% NAs` <- paste0(Profile_COUNTERPARTIES$`% NAs` *100, "%")
 
 
 #########################################

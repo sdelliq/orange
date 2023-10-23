@@ -5,12 +5,13 @@
 #summary table for totals
 r.introductionP6 <- LOANS %>% 
   summarise(
-    '# Borrowers' = n_distinct(id.bor),
-    '# LOANS' = n_distinct(id.loan),
-    'GBV (m)' = round(sum(gbv.residual) / 1e6, 1),  # Round GBV to 2 decimal places and convert to millions
+    'Borrowers' = n_distinct(id.bor),
+    'Loans' = n_distinct(id.loan),
+    'GBV (M)' = round(sum(gbv.residual) / 1e6, 1),  # Round GBV to 2 decimal places and convert to millions
     'Average Borrower size (k)' = round(sum(gbv.residual) / n_distinct(id.bor) / 1e3, 1),  # Round average borrower size to 2 decimal places and convert to thousands
     'Average loan size (k)' = round(sum(gbv.residual) / n_distinct(id.loan) / 1e3, 1)  # Round average loan size to 2 decimal places and convert to thousands
   )
+
 
 ###-----------------------------------------------------------------------###
 #-----                     Page 27 reports                                -----         
@@ -33,13 +34,13 @@ r.p27.geographicalDistribution <- Borrowers %>%
 r.p27.borrowerByArea <- ggplot(r.p27.geographicalDistribution, aes(x = area, y = `Borrower %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
   labs(x = "Area", y = "Borrowers %", title= "Borrowers % per Area") + 
-  geom_text(aes(label = `Borrower %`), vjust = 2.5, size = 5)
+  geom_text(aes(label = `Borrower %`), vjust = 1, size = 5)
 r.p27.borrowerByArea
 
 r.p27.gbvByArea <- ggplot(r.p27.geographicalDistribution, aes(x = area, y = `GBV %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
   labs(x = "Area", y = "GBV %", title= "GBV % per Area") + 
-  geom_text(aes(label = `GBV %`), vjust = 2.5, size = 5)
+  geom_text(aes(label = `GBV %`), vjust = 1, size = 5)
 r.p27.gbvByArea
 
 #GBV by borrower province
@@ -51,7 +52,17 @@ r.p27.borrowersByProvince <- Borrowers %>% select(id.counterparty,gbv.residual,o
   arrange(desc(sum_gbv))
 # the top 5 are Roma (rm), Teramo(te), Pescara(pe) ,Milano (mi), Genova (ge)
 r.p27.borrowersByProvince.head <- head(r.p27.borrowersByProvince, 5)
+r.p27.borrowersByProvince.head <- r.p27.borrowersByProvince.head %>% as.data.frame()
+r.p27.borrowersByProvince.head.support.table <- r.p27.borrowersByProvince.head %>% select(-sum_gbv)
+r.p27.borrowersByProvince.head.support.table <- r.p27.borrowersByProvince.head.support.table %>% 
+  rename("Province" = "or.province", "N Borrowers" = "N_borr", "Mean Size Borrowers (k)" = "avg_size")
 
+
+r.p27.borrowersByProvince.top.5 <- ggplot(r.p27.borrowersByProvince.head, aes(x = sum_gbv, y = or.province)) +
+  geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
+  labs(x = "GBV %", y = "Province", title= "GBV % per Province") + 
+  geom_text(aes(label = sum_gbv), vjust = 1, size = 5)
+r.p27.borrowersByProvince.top.5
 
 
 ###-----------------------------------------------------------------------###
@@ -145,6 +156,6 @@ r.p31.gbvByGuaranteedType <- df1 %>% select(gbv.residual, guarantee.type) %>% gr
 r.p31.g.gbvByGuaranteedType <- ggplot(r.p31.gbvByGuaranteedType, aes(x = guarantee.type, y = `GBV %`)) +
   geom_bar(stat = 'identity', fill = "#71EAF7", alpha = 0.7) +
   labs(x = "Guarantee Type", y = "GBV %", title= "GBV Residual % per Guarantee Type") + 
-  geom_text(aes(label = `GBV %`), vjust = 1, size = 5)
+  geom_text(aes(label = `GBV %`), vjust = 1, size = 3) + theme(axis.text.x = element_text(angle=30))
 r.p31.g.gbvByGuaranteedType
 #custom_colors <- c("#054A53", "#ACDBE1", "#008197", "#28464B", "#003A44", "#595F60")
